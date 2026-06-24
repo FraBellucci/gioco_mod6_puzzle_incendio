@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>MOD6 – Puzzle: Piano di Emergenza Incendio</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: linear-gradient(135deg, #7f0000 0%, #b71c1c 100%);
+    min-height: 100vh;
+    padding: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.container { width: 800px; height: 550px; overflow: hidden; position: relative; }
+.header {
+    background: white;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,.2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.header-left h1 { color: #b71c1c; font-size: 1.1em; margin-bottom: 2px; }
+.header-left p { color: #666; font-size: 0.78em; }
+.stats { display: flex; gap: 8px; align-items: center; }
+.stat-box { background: #ffebee; padding: 5px 11px; border-radius: 6px; font-weight: bold; color: #b71c1c; font-size: 0.78em; }
+.reset-btn { background: #b71c1c; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-size: 0.78em; cursor: pointer; font-weight: bold; transition: background .2s; }
+.reset-btn:hover { background: #7f0000; }
+.reset-btn.secondary { background: #6b7280; }
+.reset-btn.secondary:hover { background: #4b5563; }
+.game-area { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; height: 440px; }
+
+/* Left panel */
+.left-panel {
+    background: white;
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 3px 12px rgba(0,0,0,.1);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow: hidden;
+}
+.left-panel h2 { color: #b71c1c; font-size: 16px; flex-shrink: 0; }
+.reference-img {
+    width: 100%;
+    max-width: 130px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    flex-shrink: 0;
+}
+.pieces-section { flex: 1; overflow-y: auto; min-height: 0; max-height: 220px; }
+.pieces-section h3 { color: #c62828; font-size: 16px; margin-bottom: 6px; }
+.pieces-pool {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+    gap: 5px;
+}
+
+/* Right panel */
+.puzzle-panel {
+    background: white;
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 3px 12px rgba(0,0,0,.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.puzzle-panel h2 { color: #b71c1c; font-size: 0.82em; align-self: flex-start; }
+.puzzle-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    background: #ef9a9a;
+    padding: 2px;
+    border-radius: 8px;
+    width: 246px;
+}
+.puzzle-slot {
+    aspect-ratio: 0.75;
+    background: #fff5f5;
+    position: relative;
+    overflow: hidden;
+    transition: background .2s;
+}
+.puzzle-slot.drag-over { background: #ffcdd2; outline: 2px dashed #c62828; }
+.puzzle-slot.filled { background: transparent; }
+
+/* Pieces */
+.puzzle-piece {
+    cursor: move;
+    border-radius: 4px;
+    transition: transform .2s, opacity .2s;
+    box-shadow: 0 2px 5px rgba(0,0,0,.2);
+    background-size: 300% 400%;
+    aspect-ratio: 0.75;
+    background-repeat: no-repeat;
+}
+.puzzle-piece:hover { transform: scale(1.07); box-shadow: 0 4px 10px rgba(0,0,0,.25); }
+.puzzle-piece.dragging { opacity: 0.4; transform: scale(0.95); }
+
+/* Victory */
+.victory-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(127,0,0,.93);
+    border-radius: 10px;
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+.victory-overlay.show { display: flex; }
+.victory-overlay h2 { color: #fff; font-size: 1.7em; }
+.victory-overlay p { color: #ffcdd2; font-size: 0.9em; text-align: center; max-width: 380px; line-height: 1.6; }
+.victory-stats { display: flex; gap: 12px; }
+.victory-stat { background: rgba(255,255,255,.15); border-radius: 8px; padding: 8px 18px; color: #fff; font-size: 13px; font-weight: 700; text-align: center; }
+.victory-stat span { display: block; font-size: 10px; opacity: .8; margin-bottom: 2px; }
+.btn-win { background: #fff; color: #b71c1c; border: none; padding: 10px 26px; font-size: 14px; border-radius: 8px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+.btn-win:hover { background: #ffebee; }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div class="header-left">
+            <h1>🧩 Puzzle – Piano di Emergenza Incendio</h1>
+            <p>Modulo 6 – Rischio incendio in logistica · Procedura RACE</p>
+        </div>
+        <div class="stats">
+            <div class="stat-box">Pezzi: <span id="placed">0</span>/12</div>
+            <div class="stat-box">Mosse: <span id="moves">0</span></div>
+            <button class="reset-btn" onclick="resetGame()">🔄 Ricomincia</button>
+            <button class="reset-btn secondary" onclick="window.close()">✕ Torna al corso</button>
+        </div>
+    </div>
+
+    <div class="game-area">
+        <div class="left-panel">
+            <h2>📋 Immagine di riferimento</h2>
+            <img src="images/race_incendio.jpg" alt="Piano di emergenza incendio RACE" class="reference-img" id="referenceImg">
+            <div class="pieces-section">
+                <h3>🧩 Pezzi disponibili — trascinali nella griglia</h3>
+                <div class="pieces-pool" id="piecesPool"></div>
+            </div>
+        </div>
+        <div class="puzzle-panel">
+            <h2>🎯 Griglia — ricomponi il piano di emergenza (3×4)</h2>
+            <div class="puzzle-grid" id="puzzleGrid"></div>
+        </div>
+    </div>
+
+    <div class="victory-overlay" id="victoryOverlay">
+        <div style="font-size:56px">🔥</div>
+        <h2>Piano completato!</h2>
+        <p>Hai ricomposto il piano di emergenza incendio in <strong id="finalMoves">0</strong> mosse!<br>
+        <span style="font-size:.88em;opacity:.85">Ricorda la procedura RACE: R=Rimuovi le persone, A=Allerta (premi il pulsante e chiama il 115), C=Confina (chiudi porte e finestre), E=Estingui o Evacua.</span></p>
+        <div class="victory-stats">
+            <div class="victory-stat"><span>Pezzi</span>12/12</div>
+            <div class="victory-stat"><span>Mosse</span><span id="finalMovesB">0</span></div>
+        </div>
+        <button class="btn-win" onclick="resetGame()">🔄 Gioca ancora</button>
+    </div>
+</div>
+
+<script>
+    const ROWS = 4, COLS = 3, TOTAL = ROWS * COLS;
+    const IMG = 'images/race_incendio.jpg';
+    let pieces = [], grid = [], moves = 0, placed = 0;
+
+    function initGame() {
+        pieces = [];
+        grid = Array(TOTAL).fill(null);
+        moves = 0;
+        placed = 0;
+        updateStats();
+        createPuzzle();
+        document.getElementById('victoryOverlay').classList.remove('show');
+    }
+
+    function createPuzzle() {
+        for (let i = 0; i < TOTAL; i++) {
+            pieces.push({ id: i, row: Math.floor(i / COLS), col: i % COLS });
+        }
+        pieces.sort(() => Math.random() - 0.5);
+        renderGrid();
+        renderPool();
+    }
+
+    function renderGrid() {
+        const gridEl = document.getElementById('puzzleGrid');
+        gridEl.innerHTML = '';
+        for (let i = 0; i < TOTAL; i++) {
+            const slot = document.createElement('div');
+            slot.className = 'puzzle-slot' + (grid[i] !== null ? ' filled' : '');
+            slot.dataset.pos = i;
+            slot.addEventListener('dragover', e => { e.preventDefault(); slot.classList.add('drag-over'); });
+            slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+            slot.addEventListener('drop', e => { e.preventDefault(); slot.classList.remove('drag-over'); handleDrop(e, i); });
+            if (grid[i] !== null) {
+                const p = pieces.find(x => x.id === grid[i]);
+                slot.appendChild(makePiece(p, true));
+            }
+            gridEl.appendChild(slot);
+        }
+    }
+
+    function renderPool() {
+        const pool = document.getElementById('piecesPool');
+        pool.innerHTML = '';
+        pieces.forEach(p => {
+            if (!grid.includes(p.id)) pool.appendChild(makePiece(p, false));
+        });
+    }
+
+    function makePiece(p, inGrid) {
+        const div = document.createElement('div');
+        div.className = 'puzzle-piece';
+        div.draggable = true;
+        div.dataset.id = p.id;
+        const bx = (p.col * 100) / (COLS - 1);
+        const by = (p.row * 100) / (ROWS - 1);
+        div.style.backgroundImage = `url(${IMG})`;
+        div.style.backgroundPosition = `${bx}% ${by}%`;
+        div.addEventListener('dragstart', e => {
+            e.dataTransfer.setData('pieceId', p.id);
+            if (inGrid) e.dataTransfer.setData('fromPos', grid.indexOf(p.id));
+            div.classList.add('dragging');
+        });
+        div.addEventListener('dragend', () => div.classList.remove('dragging'));
+        return div;
+    }
+
+    function handleDrop(e, pos) {
+        const pid = parseInt(e.dataTransfer.getData('pieceId'));
+        const fromPos = e.dataTransfer.getData('fromPos');
+        if (fromPos !== '' && parseInt(fromPos) !== pos) grid[parseInt(fromPos)] = null;
+        if (grid[pos] === null) {
+            grid[pos] = pid;
+            if (fromPos === '') placed++;
+            moves++;
+            updateStats();
+            renderGrid();
+            renderPool();
+            checkVictory();
+        }
+    }
+
+    function checkVictory() {
+        if (placed < TOTAL) return;
+        for (let i = 0; i < TOTAL; i++) { if (grid[i] !== i) return; }
+        setTimeout(() => {
+            document.getElementById('finalMoves').textContent = moves;
+            document.getElementById('finalMovesB').textContent = moves;
+            document.getElementById('victoryOverlay').classList.add('show');
+        }, 400);
+    }
+
+    function updateStats() {
+        document.getElementById('placed').textContent = placed;
+        document.getElementById('moves').textContent = moves;
+    }
+
+    function resetGame() { initGame(); }
+    initGame();
+</script>
+</body>
+</html>
